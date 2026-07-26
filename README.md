@@ -4,10 +4,12 @@ Four independent Claude Code repos that compose into one working loop:
 **start a session with context → route the work to the right surface → review it →
 log what happened → turn the log back into better prompts.**
 
-Each repo stands alone and is useful alone. This repo is the connective tissue: the
-map of how they fit, an installer that sets them up in dependency order, and an
-onboarding path that gets you from zero to the full loop without swallowing all four
-at once.
+Each repo stands alone and is useful alone. This repo is the map of how they fit, an
+installer that sets up whichever ones you want, and a how-to for picking them up at
+whatever pace suits you.
+
+Nothing here is required. Take one, take three, take the lot — the seams are built so
+a missing tool degrades instead of breaking.
 
 ---
 
@@ -53,7 +55,7 @@ at once.
    └──────────────────────────────────────────────────────────────┘
 ```
 
-The one non-obvious property: **the last step feeds the first.** `clog-lessons` reads
+The bit that isn't obvious: **the last step feeds the first.** `clog-lessons` reads
 the `LEARNING` entries the other three tools produced as a side effect of working, and
 proposes concrete diffs to your `CLAUDE.md` and skills. Nothing else in the loop has to
 be instrumented for that to work — the logging already happened.
@@ -62,7 +64,7 @@ be instrumented for that to work — the logging already happened.
 
 ## How they actually connect
 
-Four real seams, not aspirational ones:
+Four seams that actually exist:
 
 1. **clog is the shared write target.** orchestrate logs every dispatch/join/learning to
    it (auto-detected; falls back to plain JSONL if absent). Every dev-prompter skill
@@ -76,7 +78,7 @@ Four real seams, not aspirational ones:
    because another is missing. See the degradation matrix in
    [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
-Full detail, including the naming gotcha where pm's public config calls clog `logTool`:
+Full detail, plus the gotchas worth knowing before they bite:
 **[docs/INTEGRATION.md](docs/INTEGRATION.md)**.
 
 ---
@@ -91,33 +93,49 @@ cd ~/Code/toolkit
 
 `install.sh` is **interactive and à la carte** — it asks about each repo separately,
 clones only what you say yes to, and then delegates to that repo's own installer rather
-than reimplementing it. It installs in dependency order (clog → dev-prompter →
-orchestrate → pm) so each tool finds its optional dependencies already present.
+than reimplementing it. It walks them in the order clog → dev-prompter → orchestrate →
+pm so each one finds its optional dependencies already present.
+
+> **It clones four repos from `github.com/eimaj` and runs each one's installer.** That
+> is code from the internet executing on your machine, at whatever their default branch
+> happens to be. Read `install.sh` first, or start with `--dry-run` below.
 
 ```bash
-./install.sh --dry-run          # print every action, change nothing
-./install.sh --all              # yes to all four, no prompts
+./install.sh --dry-run          # change nothing, and run each tool's own dry-run
+./install.sh --all              # accept all four, no prompts
 ./install.sh --root ~/src       # clone somewhere other than ~/Code
 ./install.sh --only clog,dev-prompter
 ```
 
-Existing clones are detected and reused — it never re-clones over your work, and never
-pulls without asking.
+`--dry-run` is a real preview, not a printed guess — it invokes each tool's own
+`--dry-run` so the output comes from the installer that owns the work.
 
-**Requirements:** `bash`, `git`, `jq`. `gh` for the GitHub-facing bits.
-macOS / Linux / WSL. `herdr` only if you want `/dev-tab`.
+Nothing is installed without an answer. With no terminal to prompt on — CI, a pipe, an
+agent — it refuses and tells you to pass `--all`. Existing clones are reused (never
+re-cloned, never pulled without asking) and only after checking their `origin` is the
+repo it expects. Existing skills and symlinks are never overwritten; collisions are
+skipped and reported at the end.
+
+**Requirements:** `bash`, `git`. Add `jq` if you want pm, `gh` for the GitHub-facing
+skills, and [`herdr`](https://herdr.dev) if you want dev-prompter's `/dev-tab` and
+`/dev-tab-q`. macOS / Linux / WSL.
 
 ---
 
-## You probably shouldn't install all four on day one
+## Probably don't install all four on day one
 
 The loop is worth more than any one piece, but adopting it all at once means learning
-four workflows while trying to get actual work done. The recommended path is
-**clog → dev-prompter → orchestrate → pm**, one per week, each one adding a step to a
-loop that already works.
+four workflows while trying to get actual work done. If you want all of them, the
+order that goes down easiest is **clog → dev-prompter → orchestrate → pm** — each one
+adds a step to a loop that already works without it.
 
-That path — with what to actually do on each day, and the checkpoint that tells you
-you're ready for the next piece — is in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
+**[docs/ONBOARDING.md](docs/ONBOARDING.md)** is the how-to: the exact commands per
+tool, what to verify after each, and a checkpoint that says whether the next piece is
+worth it. It's paced out over four weeks, which is a suggestion and not a schedule —
+go faster, stop after one, whatever fits.
+
+Prefer to be walked through it? `/toolkit-setup` runs the same path interactively in a
+Claude Code session, asking before each step.
 
 ### Useful subsets
 
