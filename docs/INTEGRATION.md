@@ -119,9 +119,10 @@ Pick the **surface** by how you want to interact (inline / separate pane / one-s
 subagent) and the **cycle** by whether you want it reviewed. The `-q` suffix is always
 "skip the review."
 
-**The gate, verbatim from dev-prompter:** *"if the ask needs multiple phases, will
-produce tracked artifacts, or involves iterative cycles, stop here and use
-`/orchestrate` instead."*
+**The gate, as `/dev-sa` words it:** *"if the ask needs multiple phases (write → review
+→ retro), will produce tracked artifacts, or involves iterative cycles, stop here and
+use `/orchestrate` instead."* The other `/dev` skills carry the same rule in their own
+words.
 
 ---
 
@@ -158,7 +159,8 @@ What breaks when a piece is missing. "Degrades" means documented fallback, not f
 | **orchestrate** | unaffected | routing gate points at a command you don't have | — | `briefs_dir` stays empty |
 | **pm** | unaffected | unaffected | unaffected | — |
 
-**Read the first column as: "if clog is missing, here's what each tool does."**
+Read across a row: the leftmost cell names what is absent, the rest say how each tool
+copes.
 
 The pattern: clog is depended *on* by all three and depends on none; pm is depended on
 by none and optionally reads all three. Install in that order and every optional
@@ -184,7 +186,9 @@ your active MCP servers, then walks you through naming tools around what it foun
 Run it before installing the others and it can't offer you `clog-week` or `pr-review`
 as skill links — you'd have to re-run `/pm-generate` afterward anyway.
 
-`install.sh` in this repo enforces this order. If you install by hand, follow it.
+`install.sh` walks them in that order so each one's optional dependencies are already
+present. Installing by hand out of order is recoverable — the only part that really
+matters is clog before the others, and pm last.
 
 ---
 
@@ -200,7 +204,8 @@ Things all four assume, worth knowing once:
 - **Personal config is gitignored and lives outside the repo** —
   `~/.config/clog/config.yaml`, `~/.config/pm/config.json`. orchestrate is the odd one
   out: its `config.json` sits in the repo root, gitignored.
-- **Installers are idempotent and never overwrite.** Every one of them warns and skips
-  when a target exists and isn't a symlink it owns. Re-run freely.
+- **Installers are idempotent and never overwrite.** A real directory, or a symlink
+  pointing anywhere other than where this installer would point it, is skipped and
+  reported. Re-run freely.
 - **Nothing auto-applies a change to your prompts.** `clog-lessons` proposes diffs.
   `/pr-review` is advisory. orchestrate's retro writes a report. You decide.
