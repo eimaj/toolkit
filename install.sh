@@ -9,10 +9,12 @@
 # Order is clog -> dev-prompter -> orchestrate -> pm, so each tool finds its optional
 # dependencies already present. See docs/INTEGRATION.md for why pm goes last.
 #
-# --dry-run runs each tool's OWN dry-run, so the preview shows what every installer
-# would actually touch — not just that it would be called.
+# Two preview modes, deliberately separate:
+#   --dry-run  inert and local. Prints what this script would do and runs nothing.
+#   --preview  additionally runs each tool's own --dry-run, which means EXECUTING code
+#              from those repos. Better preview, real trust cost — hence opt-in.
 #
-# Usage: ./install.sh [--all] [--dry-run] [--root DIR] [--only a,b,c] [--help]
+# Usage: ./install.sh [--all] [--dry-run|--preview] [--root DIR] [--only a,b,c] [--help]
 
 set -euo pipefail
 
@@ -24,6 +26,7 @@ ROOT="${TOOLKIT_ROOT_DIR:-$HOME/Code}"
 SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 AGENTS_DIR="${CLAUDE_AGENTS_DIR:-$HOME/.claude/agents}"
 DRY_RUN=false
+PREVIEW=false
 ASSUME_YES=false
 ONLY=""
 
@@ -39,13 +42,17 @@ repo_url() {
   esac
 }
 
-# Reduce a remote URL to owner/repo so the SSH and HTTPS forms of the same repo
-# compare equal — plenty of people clone over SSH.
-repo_slug() {
+# Extract owner/repo from a remote, but ONLY when the host really is github.com.
+# The host must be anchored, not stripped to: a greedy "${u##*github.com/}" reduced
+# https://evil.example.com/github.com/eimaj/clog to eimaj/clog, so a hostile checkout
+# passed the origin check below and had its installer executed. Anything that is not
+# a plain github.com remote returns empty, which can never equal an expected slug.
+github_slug() {
   local u="${1%.git}"
-  u="${u##*github.com:}"
-  u="${u##*github.com/}"
-  echo "$u"
+  u="${u%/}"
+  if [[ "$u" =~ ^(https://|http://|ssh://)?(git@)?github\.com[:/]([^/]+)/([^/]+)$ ]]; then
+    echo "${BASH_REMATCH[3]}/${BASH_REMATCH[4]}"
+  fi
 }
 
 repo_blurb() {
@@ -65,8 +72,12 @@ Usage: ./install.sh [options]
                     no terminal to prompt on (CI, pipes, agents).
   --only a,b,c      Consider only these repos (clog, dev-prompter, orchestrate, pm).
   --root DIR        Where to clone repos. Default: ~/Code
-  --dry-run         Change nothing, and run each tool's own dry-run so the preview
-                    shows what that installer would touch.
+  --dry-run         Change nothing and run nothing. Prints what this script would do.
+                    Safe to use on a repo you have not read yet.
+  --preview         Everything --dry-run does, and additionally runs each tool's own
+                    --dry-run for a fuller picture. That EXECUTES code from those
+                    repos, so only use it once you trust them. Repos that are not
+                    cloned yet are reported, not fetched.
   -h, --help        This message.
 
 Pick any subset. Repos are walked in the order clog -> dev-prompter -> orchestrate
@@ -86,6 +97,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --all)     ASSUME_YES=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
+    --preview) DRY_RUN=true; PREVIEW=true; shift ;;
     --root)    ROOT="${2:?--root needs a directory}"; shift 2 ;;
     --root=*)  ROOT="${1#*=}"; [[ -n "$ROOT" ]] || { echo "--root needs a directory" >&2; exit 1; }; shift ;;
     --only)    ONLY="${2:?--only needs a comma-separated list}"; shift 2 ;;
@@ -96,6 +108,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 ROOT="${ROOT/#\~/$HOME}"
+
+# $ROOT lands in git clone's positional slot, and git's option parser will happily
+# read a leading dash there as a flag: --root '--template=/tmp/evil' makes git install
+# hooks from that path and fire post-checkout during the clone. Reject it outright;
+# every git invocation below also uses -- to end option parsing.
+# Inline echo/exit rather than fail(): the helpers are not defined until below.
+[[ "$ROOT" != -* ]] || { echo "ERROR: --root must be a path, not an option: $ROOT" >&2; exit 1; }
 
 say()   { echo "  $*"; }
 info()  { echo ""; echo "==> $*"; }
@@ -173,9 +192,13 @@ ensure_clone() {
     # Confirm it is actually the expected repo before running anything inside it —
     # clog/pm/orchestrate are generic directory names and an unrelated checkout
     # would otherwise get its installer executed.
-    local origin
+    local origin expected actual
     origin="$(git -C "$dest" remote get-url origin 2>/dev/null || echo "")"
-    if [[ "$(repo_slug "$origin")" != "$(repo_slug "$url")" ]]; then
+    expected="$(github_slug "$url")"
+    actual="$(github_slug "$origin")"
+    # An unresolvable expected slug would make every comparison pass on empty==empty.
+    [[ -n "$expected" ]] || fail "internal: could not parse the expected remote for $name"
+    if [[ "$actual" != "$expected" ]]; then
       warn "$dest is a git repo, but its origin is '${origin:-none}' rather than $url"
       # A fork is a legitimate reason to say yes, so a human gets the choice. An
       # unattended run does not — it skips rather than executing an unknown repo.
@@ -189,9 +212,9 @@ ensure_clone() {
     warn "$dest exists but is not a git clone — skipping $name"
     return 1
   else
-    run mkdir -p "$ROOT"
+    run mkdir -p -- "$ROOT"
     say "cloning $url -> $dest"
-    if ! run git clone --quiet "$url" "$dest"; then
+    if ! run git clone --quiet -- "$url" "$dest"; then
       warn "clone failed for $name"
       return 1
     fi
@@ -208,13 +231,23 @@ ensure_clone() {
 # aborts. macOS still ships bash 3.2, and args IS empty on the common path (a real
 # install with no --dry-run and no --migrate).
 #
-# run_installer EXECUTES even under --dry-run, passing that tool's own --dry-run.
-# The preview then comes from the installer that owns the work instead of from a
-# guess here, and it covers what that tool would touch, not merely that it would run.
+# Plain --dry-run runs NOTHING: the whole point of a dry run is to be safe on a repo
+# you have not read, and delegating the preview to an untrusted installer would make
+# the cautious path the dangerous one. --preview opts into executing each tool's own
+# --dry-run for a fuller picture, and says so up front.
 run_installer() {
   local script="$1"; shift
+  if $DRY_RUN && ! $PREVIEW; then
+    say "[dry-run] would run: bash $script $*"
+    return 0
+  fi
   if [[ ! -f "$script" ]]; then
-    warn "expected installer not found: $script"
+    if $PREVIEW; then
+      warn "not cloned yet, so there is nothing to preview: $script"
+      warn "run without --preview first, or clone it yourself"
+    else
+      warn "expected installer not found: $script"
+    fi
     return 1
   fi
   bash "$script" "$@"
@@ -243,7 +276,9 @@ install_clog() {
       say "continuing without --migrate — clog's setup will decline to overwrite it"
     fi
   fi
-  run_installer "$dir/setup.sh" "${args[@]+"${args[@]}"}"
+  # `|| return 1` is load-bearing: a function returns its LAST command's status, so
+  # ending on NOTES+=() reported every failed sub-installer as a success.
+  run_installer "$dir/setup.sh" "${args[@]+"${args[@]}"}" || return 1
   NOTES+=("clog: set log_root in ~/.config/clog/config.yaml, and confirm 'command -v clog' resolves (its CLI lands in ~/.local/bin)")
 }
 
@@ -286,7 +321,7 @@ install_dev_prompter() {
 install_orchestrate() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
-  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}"
+  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}" || return 1
   NOTES+=("orchestrate: set artifact_root in $dir/config.json")
   NOTES+=("orchestrate: copy a recipe and the agents it names into recipes/local/ and prompts/agents/local/ — code-writer's three run as shipped; feature-scoper's carry [TODO] personas and fast-fail until filled in")
 }
@@ -294,14 +329,19 @@ install_orchestrate() {
 install_pm() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
-  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}"
+  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}" || return 1
   NOTES+=("pm: run /pm-generate in Claude Code — and when it reaches the 'logs' group, set the provider to 'clog' (the example config's placeholder is 'logTool')")
 }
 
 # ── Preflight ───────────────────────────────────────────────────────────────────
 echo "toolkit installer — clog, dev-prompter, orchestrate, pm"
 echo "clones from github.com/eimaj and runs each repo's own installer."
-$DRY_RUN && echo "(dry-run — nothing changes; each tool's own --dry-run is run instead)"
+if $PREVIEW; then
+  echo "(preview — nothing is written, but each tool's own installer IS executed"
+  echo " with its --dry-run flag. That runs code from those repos.)"
+elif $DRY_RUN; then
+  echo "(dry-run — nothing is written and no installer is executed)"
+fi
 
 # Consent cannot be inferred from silence. Without a terminal there is nobody to ask,
 # so the only non-interactive path is an explicit --all.
@@ -352,11 +392,13 @@ SUMMARY_PRINTED=false
 summary() {
   $SUMMARY_PRINTED && return 0
   SUMMARY_PRINTED=true
+  local verb="Installed"
+  $DRY_RUN && verb="Would install"
   info "Done."
   if [[ ${#INSTALLED[@]} -gt 0 ]]; then
-    say "Installed: ${INSTALLED[*]}"
+    say "${verb}: ${INSTALLED[*]}"
   else
-    say "Installed: nothing"
+    say "${verb}: nothing"
   fi
   [[ ${#SKIPPED[@]} -gt 0 ]] && say "Skipped:   ${SKIPPED[*]}"
   [[ ${#FAILED[@]}  -gt 0 ]] && say "Failed:    ${FAILED[*]}"
@@ -372,7 +414,7 @@ summary() {
   fi
 
   echo ""
-  if [[ ${#INSTALLED[@]} -gt 0 ]]; then
+  if [[ ${#INSTALLED[@]} -gt 0 ]] && ! $DRY_RUN; then
     say "Restart your Claude Code session so it re-scans ${SKILLS_DIR}."
     say "docs/ONBOARDING.md is the how-to; /toolkit-setup walks you through it in a session."
   fi
@@ -426,3 +468,7 @@ for name in "${ORDER[@]}"; do
     FAILED+=("$name")
   fi
 done
+
+# A broken install must be visible to CI, agents, and && chains — not just to a reader
+# of the summary. The EXIT trap still prints before this takes effect.
+(( ${#FAILED[@]} == 0 )) || exit 1
