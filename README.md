@@ -98,17 +98,22 @@ pm so each one finds its optional dependencies already present.
 
 > **It clones four repos from `github.com/eimaj` and runs each one's installer.** That
 > is code from the internet executing on your machine, at whatever their default branch
-> happens to be. Read `install.sh` first, or start with `--dry-run` below.
+> happens to be. Read `install.sh` first, or start with `--dry-run` below — it executes
+> nothing.
 
 ```bash
-./install.sh --dry-run          # change nothing, and run each tool's own dry-run
+./install.sh --dry-run          # change nothing, run nothing
+./install.sh --preview          # also run each tool's own dry-run (executes their code)
 ./install.sh --all              # accept all four, no prompts
 ./install.sh --root ~/src       # clone somewhere other than ~/Code
 ./install.sh --only clog,dev-prompter
 ```
 
-`--dry-run` is a real preview, not a printed guess — it invokes each tool's own
-`--dry-run` so the output comes from the installer that owns the work.
+Two preview modes, kept apart on purpose. **`--dry-run` runs nothing** — it prints what
+this script would do and never executes another installer, so it's safe on a repo you
+haven't read yet. **`--preview`** additionally runs each tool's own `--dry-run` for a
+fuller picture, which means executing code from those repos; it's opt-in for exactly
+that reason, and it reports rather than fetches anything not already cloned.
 
 Nothing is installed without an answer. With no terminal to prompt on — CI, a pipe, an
 agent — it refuses and tells you to pass `--all`. Existing clones are reused (never
