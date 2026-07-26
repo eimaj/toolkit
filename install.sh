@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# This repo's own root, used to link the walkthrough skill. The ${...:-$0} fallback
+# keeps `cat install.sh | bash` from aborting on an unbound BASH_SOURCE under set -u.
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)" || SELF="$PWD"
+
 ROOT="${TOOLKIT_ROOT_DIR:-$HOME/Code}"
 SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 AGENTS_DIR="${CLAUDE_AGENTS_DIR:-$HOME/.claude/agents}"
@@ -375,6 +379,19 @@ summary() {
   echo ""
 }
 trap summary EXIT
+
+# ── The walkthrough skill ───────────────────────────────────────────────────────
+# Linked regardless of which repos were chosen: it is this repo's own skill, and it is
+# what a person runs to be walked through the rest.
+info "toolkit-setup — the interactive walkthrough (/toolkit-setup)"
+if prompt_yn "Link the walkthrough skill into ${SKILLS_DIR}?" "y"; then
+  run mkdir -p "$SKILLS_DIR"
+  if link_dir "$SELF/skills/toolkit-setup" "$SKILLS_DIR/toolkit-setup"; then
+    NOTES+=("run /toolkit-setup in Claude Code to be walked through the tools you picked")
+  fi
+else
+  say "skipped — docs/ONBOARDING.md has the same path to follow by hand."
+fi
 
 # ── Main loop ───────────────────────────────────────────────────────────────────
 # One repo's failure never stops the others: each is independent, and a half-run that
