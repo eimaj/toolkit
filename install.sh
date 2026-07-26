@@ -144,6 +144,11 @@ ensure_clone() {
 # ── Per-repo installers ─────────────────────────────────────────────────────────
 # Each one delegates to the repo's own installer where one exists. dev-prompter is the
 # exception: it ships no installer, so we do the documented symlink install here.
+#
+# Forwarded flags use the "${args[@]+"${args[@]}"}" guard, not a bare "${args[@]}":
+# under `set -u`, bash < 4.4 treats an empty array expansion as an unbound variable and
+# aborts. macOS still ships bash 3.2, and args IS empty on the common path (a real
+# install with no --dry-run and no --migrate).
 
 install_clog() {
   local dir="$1" args=()
@@ -153,7 +158,7 @@ install_clog() {
     say "existing clog install detected — passing --migrate (backs up, never deletes)"
     args+=(--migrate)
   fi
-  run bash "$dir/setup.sh" "${args[@]}"
+  run bash "$dir/setup.sh" "${args[@]+"${args[@]}"}"
   NOTES+=("clog: set log_root in ~/.config/clog/config.yaml to somewhere you'll actually look")
 }
 
@@ -177,7 +182,7 @@ install_dev_prompter() {
 install_orchestrate() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
-  run bash "$dir/install.sh" "${args[@]}"
+  run bash "$dir/install.sh" "${args[@]+"${args[@]}"}"
   NOTES+=("orchestrate: set artifact_root in $dir/config.json")
   NOTES+=("orchestrate: copy a recipe + its agents into recipes/local/ and prompts/agents/local/, then replace every [TODO] — runs fast-fail on placeholders")
 }
@@ -186,7 +191,7 @@ install_pm() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
   command -v jq >/dev/null 2>&1 || fail "pm requires jq. Install it (brew install jq) and re-run."
-  run bash "$dir/install.sh" "${args[@]}"
+  run bash "$dir/install.sh" "${args[@]+"${args[@]}"}"
   NOTES+=("pm: run /pm-generate in Claude Code — and when it reaches the 'logs' group, set the provider to 'clog' (the example config's placeholder is 'logTool')")
 }
 
