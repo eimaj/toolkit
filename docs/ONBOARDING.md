@@ -1,316 +1,370 @@
-# Onboarding — zero to the full loop in four weeks
+# Onboarding — the how-to
 
-You can install all four repos in ten minutes. **Don't.** Each one changes a habit, and
-four habit changes at once is how a toolkit becomes shelfware.
+Four tools, four stages. Each stage installs one, uses it for real, and ends with a
+**checkpoint** that says whether the next one is worth it — plus an **off-ramp**,
+because stopping after one is a perfectly good outcome.
 
-This is a four-week path. Each week adds one piece to a loop that already works without
-it, and ends with a **checkpoint** — a concrete signal you're getting value, not just
-running commands. If a checkpoint fails, stay another week. Nothing downstream needs you
-to move on.
+A week per stage is a comfortable pace, not a schedule. Go faster if it's landing.
 
-If you'd rather just install everything: `./install.sh --all`, then read
-[INTEGRATION.md](INTEGRATION.md) and skip this file.
+Every step below is `RUN` → `VERIFY` → `EXPECT`, so this doubles as the script an agent
+follows. `/toolkit-setup` walks the same path interactively and asks before each step.
+
+> `$TK` below is wherever you cloned the repos — `~/Code` unless you passed `--root`.
+> `export TK=~/Code` once and the commands paste cleanly.
 
 ---
+
+## Start where your problem is
+
+You do not have to start at clog, and you do not have to finish.
+
+| What's actually bothering you | Start at | Need anything else? |
+| --- | --- | --- |
+| Losing the *why* when a session compacts or clears | [clog](#1--clog) | no |
+| Delegating badly; wanting a real review before you trust a change | [dev-prompter](#2--dev-prompter) | clog is optional — only the learn step uses it |
+| Big changes with no paper trail | [orchestrate](#3--orchestrate) | clog optional; it degrades to plain JSONL |
+| Losing the thread on long projects across sessions | [pm](#4--pm) | clog optional; fills pm's `logs` slot |
+
+The order below is the one that goes down easiest if you want all four — each stage
+adds a step to a loop that already works without it.
 
 ## Before you start
 
 ```bash
-command -v bash git jq     # required
-command -v gh              # needed for the GitHub-facing bits
+command -v bash git    # required
+command -v jq          # only if you want pm
 ```
 
-You should already be using Claude Code day to day. If you're evaluating Claude Code
-itself, come back to this after — the toolkit assumes the base workflow is familiar.
+Missing `jq`: `brew install jq`, or skip pm. Missing `git` or `bash`: stop here.
 
 ---
 
-## Week 1 — clog
+## 1 — clog
 
-**The habit:** write one line about what you just did, before you move to the next thing.
+**The habit:** write one line about what happened, before moving to the next thing.
 
-### Day 1 — install
+### Install
 
 ```bash
-./install.sh --only clog
+RUN:    cd $TK/toolkit && ./install.sh --only clog
+VERIFY: command -v clog
+EXPECT: a path (usually ~/.local/bin/clog)
 ```
 
-This clones clog, runs its `setup.sh` (which detects your AI tools, writes
-`~/.config/clog/config.yaml`, symlinks the skills, and registers the Claude Code
-`PostToolUse` hooks), and puts `clog` on your PATH.
+`command -v clog` printing nothing is the most common first-run snag — clog's setup
+puts the CLI in `~/.local/bin` and only *warns* if that isn't on your PATH. Fix:
 
-Then open `~/.config/clog/config.yaml` and set **`log_root`** to somewhere you'll
-actually look. Leave everything else alone for now.
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && exec zsh
+```
 
-### Days 1–3 — log manually, badly
+Then set `log_root` to somewhere you'll actually look:
 
-Don't aim for completeness. Log the three things that hurt most when you lose them:
+```bash
+RUN:    $EDITOR ~/.config/clog/config.yaml
+VERIFY: grep '^log_root:' ~/.config/clog/config.yaml
+EXPECT: a path you recognise
+```
+
+### Use it for a few days
+
+Don't aim for completeness. Log the three things that hurt most when they're lost:
 
 ```bash
 clog DECISION "chose X over Y because Z"
-clog FOLLOWUP "the thing I'll forget by Thursday"
+clog FOLLOWUP "the thing you'll forget by Thursday"
 clog LEARNING "why that attempt failed" --family tooling --kpi failure
 ```
 
-The commit/push/PR hooks fire on their own — you don't log those.
-
-### Day 3 — turn on Ledger
+Commits, pushes, and PRs are logged by hooks — don't log those by hand.
 
 ```bash
-cat ~/Code/clog/persona/PERSONA.md >> ~/.claude/CLAUDE.md
+VERIFY: ls "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"')"
+EXPECT: a YYYYMMDD.jsonl file with today's date
 ```
 
-Ledger makes any session proactively log-aware: it watches tool calls and flags
-unlogged state-changes inline. This is what moves you from "remembering to log" to
-"being reminded." (clog's `setup.sh` offers to do this for you — say yes then and skip
-this step.)
+### Turn on Ledger
 
-### Day 5 — the first retro
+Makes any session proactively log-aware — it flags unlogged state-changes inline
+instead of leaving you to remember. clog's `setup.sh` offers this; if you declined:
+
+```bash
+RUN:    less $TK/clog/persona/PERSONA.md      # read it first — it edits agent behaviour
+RUN:    cat $TK/clog/persona/PERSONA.md >> ~/.claude/CLAUDE.md
+VERIFY: grep -c 'Ledger' ~/.claude/CLAUDE.md
+EXPECT: 1 or more (run it twice and you get a duplicate block)
+```
+
+### Retro
 
 ```
-/clog-sweep     (audit mode — find what you missed, don't backfill yet)
+/clog-sweep    then say "audit my log"    → finds gaps, changes nothing
 /clog-week
 ```
 
+`/clog-sweep` picks its mode from what you ask for, not a flag: *"audit my log"* /
+*"clog gaps"* to report, *"clog it"* / *"backfill clogs"* to fill them in.
+
 ### ✅ Checkpoint
 
-**Read your `clog-week` report. Does it tell you something you'd already forgotten?**
+**Does the `clog-week` report tell you something already forgotten?**
 
-If yes, the habit is working — go to week 2. If the report is thin or generic, your
-entries are too vague. Spend another week writing *why*, not *what*: `"use yq with a
-grep fallback — avoids a mandatory dep"` beats `"updated config parsing"`.
+If yes, the habit is working. If the report reads thin, the entries are too vague —
+another few days writing *why* rather than *what*. `"use yq with a grep fallback —
+avoids a mandatory dep"` beats `"updated config parsing"`.
+
+**🚏 Off-ramp:** if session memory was the whole problem, you're done. The rest of this
+document is for people who also want the delegation, review, and project layers.
 
 ---
 
-## Week 2 — dev-prompter
+## 2 — dev-prompter
 
-**The habit:** state the contract before you delegate, and review before you trust.
+**The habit:** state the contract before delegating; review before trusting.
 
-### Day 1 — install
+### Install
 
 ```bash
-./install.sh --only dev-prompter
+RUN:    cd $TK/toolkit && ./install.sh --only dev-prompter
+VERIFY: ls ~/.claude/skills | grep -E '^(dev|dev-sa|dev-sa-q|dev-tab|dev-tab-q|pr-review|_devkit)$' | wc -l
+EXPECT: 7
 ```
 
-This symlinks the six skills plus `pr-review` into `~/.claude/skills/`, and installs
-`agents/personas.md`. **If you already maintain a `~/.claude/agents/personas.md`, the
-installer will not overwrite it** — it warns and leaves yours in place. Merge the *Task
-Personas* table in by hand.
+Seven directories: five `/dev` skills, `pr-review`, and `_devkit` — a shared base the
+others read, not a slash command. Collisions are skipped, not overwritten, and named in
+the installer's summary; check there if the count is short.
 
-### Days 1–3 — one command only
+An existing `~/.claude/agents/personas.md` is left alone. To pick up the task personas,
+merge them yourself from `$TK/dev-prompter/agents/personas.md`.
 
-Use `/dev-sa-q` and nothing else. It's the lowest-commitment surface: one-shot subagent,
-no review, protects your main session from token-heavy reads.
+Restart your Claude Code session — skills are scanned at start.
+
+### Start with one command
+
+`/dev-sa-q` is the lowest-commitment surface: one-shot subagent, no review, keeps
+token-heavy reads out of your main session.
 
 ```
 /dev-sa-q find every call site of processPayment across this repo
 ```
 
-Watch what it does with the 4-part contract — **model / persona / request / deliverable**.
-The deliverable line is the one most people under-specify; notice how much the result
-improves when it's exact.
+Watch what it does with the four-part contract — **model / persona / request /
+deliverable**. The deliverable line is the one most under-specified; being exact about
+it changes the result more than anything else.
 
-### Days 3–5 — add the review step
+### Add the review step
 
-Drop the `-q` and use `/dev-sa` on a change that actually touches files. It runs
-`/pr-review` afterward: five lenses (Saboteur, New Hire, Security Auditor, Test-coverage,
-Simplify), severity-ranked, advisory only.
+Drop the `-q` on a change that touches files. `/dev-sa` runs `/pr-review` afterward —
+five lenses, severity-ranked, advisory, never posts and never blocks.
+
+```
+/dev-sa <a change worth reviewing>
+```
 
 Then try `/pr-review` standalone on a diff you were about to push anyway.
 
+```bash
+VERIFY: grep -c LEARNING "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"')"/$(date +%Y%m%d).jsonl
+EXPECT: 1 or more, if clog is installed — the learn step closes every /dev cycle
+```
+
 ### ✅ Checkpoint
 
-**Has `/pr-review` caught one real thing you'd have shipped?**
+**Has `/pr-review` caught one real thing that would have shipped?**
 
-One is enough. If it hasn't after a week of real changes, you're likely running it on
-changes too small to warrant it — point it at your largest pending diff before deciding
-it isn't earning its place.
+One is enough. If nothing after a week of real changes, it's likely running on changes
+too small to warrant it — point it at your largest pending diff before writing it off.
 
-Also confirm the seam is live: after a `/dev-sa` run, `grep LEARNING` today's clog file.
-You should see the learn step's entry. If not, `clog` isn't on PATH from that context.
+**🚏 Off-ramp:** delegation and review stand on their own. Stages 3 and 4 are for
+multi-phase work and long-running projects respectively.
 
 ---
 
-## Week 3 — orchestrate
+## 3 — orchestrate
 
-**The habit:** for big work, write the intent down *first*, and read the retro after.
+**The habit:** for big work, write the intent down first and read the retro after.
 
-### Day 1 — install and configure
-
-```bash
-./install.sh --only orchestrate
-```
-
-Then two things the installer deliberately leaves to you:
+### Install and configure
 
 ```bash
-cd ~/Code/orchestrate
-
-# 1. artifact_root — where runs land. Point it at your notes.
-$EDITOR config.json
-
-# 2. Copy a recipe and its three agents out of the examples
-cp recipes/code-writer-once.example.json recipes/local/code-writer-once.json
-cp prompts/agents/writer.example.md   prompts/agents/local/writer.md
-cp prompts/agents/reviewer.example.md prompts/agents/local/reviewer.md
-cp prompts/agents/retro.example.md    prompts/agents/local/retro.md
+RUN:    cd $TK/toolkit && ./install.sh --only orchestrate
+VERIFY: ls ~/.claude/skills | grep -c '^orchestrate'
+EXPECT: 4
 ```
 
-**Now edit those three agent files.** They ship with `[TODO]` placeholders for persona
-and domain. A run **fast-fails** if a resolved agent still has one — this is intentional,
-not a bug. Write the persona you'd actually want: *"a senior Go backend engineer who
-treats every dependency as a liability"* beats *"a helpful assistant."*
+Two things the installer deliberately leaves to you.
 
-Confirm the clog seam picked itself up: `config.json`'s `clog.enabled` should stay
-`null` (auto-detect), and clog is already on your PATH from week 1.
+```bash
+RUN:    $EDITOR $TK/orchestrate/config.json     # set artifact_root
+VERIFY: grep artifact_root $TK/orchestrate/config.json
+EXPECT: a path you chose
+```
 
-### Day 2 — the first run
+Leave `clog.enabled` at `null` — it auto-detects.
 
-Pick something **genuinely too big for `/dev`** — multi-file, you expect pushback. That
-is the whole point; running orchestrate on a small change teaches you it's heavy, which
-you already know.
+```bash
+RUN: cd $TK/orchestrate
+RUN: cp recipes/code-writer-once.example.json recipes/local/code-writer-once.json
+RUN: cp prompts/agents/writer.example.md   prompts/agents/local/writer.md
+RUN: cp prompts/agents/reviewer.example.md prompts/agents/local/reviewer.md
+RUN: cp prompts/agents/retro.example.md    prompts/agents/local/retro.md
+```
+
+Those three agents run as shipped. Their personas are generic, though, and a specific
+one is worth more — *"a senior Go backend engineer who treats every dependency as a
+liability"* beats *"a helpful assistant"*. Edit them or don't; the run works either way.
+
+`[TODO]` placeholders only appear in the `feature-scoper` recipe's agents
+(`product-lead`, `technical-writer`), and a run fast-fails while any remain. That's
+intentional, not a bug.
+
+```bash
+VERIFY: grep -l '\[TODO' $TK/orchestrate/prompts/agents/local/*.md 2>/dev/null | wc -l
+EXPECT: 0 for the code-writer set
+```
+
+### First run
+
+Pick something genuinely too big for `/dev` — multi-file, where you expect pushback.
+Running orchestrate on a small change only teaches you it's heavy, which the README
+already said.
 
 ```
 /orchestrate code-writer-once "add rate limiting to the payments API"
 ```
 
-It asks three intake questions, writes `brief.md`, shows you a summary, waits for your
-confirm, then dispatches writer → reviewer → retro.
+Three intake questions, a `brief.md`, a summary, your confirm, then writer → reviewer →
+retro.
 
-### Day 3 — read the retro, not just the diff
+### Read the retro
 
-`{artifact_root}/runs/<run-id>/retro.md`. This is the part everyone skips and it's where
-the value is. The retro runs even when the run fails — **especially** read that one.
+```bash
+VERIFY: ls "$(grep -o '"artifact_root"[^,]*' $TK/orchestrate/config.json | cut -d'"' -f4 | sed "s|~|$HOME|")"
+EXPECT: a run directory containing brief.md, learnings.md, retro.md
+```
+
+`retro.md` is the part that gets skipped and the part that carries the value. It runs
+even when the run fails — especially read that one.
 
 ### ✅ Checkpoint
 
-**Did the retro tell you something the diff didn't?**
+**Did the retro say something the diff didn't?**
 
-If the retro reads like a restatement of the changes, your `brief.md` was too thin —
-acceptance criteria were vague, so there was nothing concrete to reflect against. Run
-`/orchestrate-brief` first next time to get explicit file scoping and sharper criteria.
+If it reads like a restatement of the changes, the `brief.md` was too thin — vague
+acceptance criteria leave nothing concrete to reflect against. Run `/orchestrate-brief`
+first next time for explicit file scoping and sharper criteria.
+
+**🚏 Off-ramp:** stage 4 is only worth it for projects you return to across many
+sessions. One-off work doesn't need it.
 
 ---
 
-## Week 4 — pm
+## 4 — pm
 
-**The habit:** open and close sessions deliberately, so tomorrow-you starts warm.
+**The habit:** open and close sessions deliberately, so the next one starts warm.
 
-pm goes last on purpose. `/pm-generate` audits your installed skills and active MCP
-servers and builds a tool registry around what it finds — running it now means it can
-offer you clog's and dev-prompter's skills as links. Run it first and you'd re-run it
-anyway.
+pm goes last on purpose: `/pm-generate` audits your installed skills and MCP servers
+and builds a tool registry from what it finds. Run it before the others and it can't
+offer clog's or dev-prompter's skills as links.
 
-### Day 1 — generate your skill set
+### Generate your skill set
 
 ```bash
-./install.sh --only pm
+RUN:    cd $TK/toolkit && ./install.sh --only pm
+VERIFY: ls ~/.claude/skills | grep -c '^pm-generate'
+EXPECT: 1
 ```
 
-Then in Claude Code:
+Restart the session, then:
 
 ```
 /pm-generate
 ```
 
-It walks you through each capability group — meetings, calendar, email, tasks, todo,
-logs, github, notes — and for each asks: include it? what do you want to **name** it?
-which provider backs it? where do its notes go? which skills link to it?
+It walks each capability group — meetings, calendar, email, tasks, todo, logs, github,
+notes — asking whether to include it, what to **name** it, which provider backs it,
+where its notes go, and which skills link to it.
 
-**Answer `none` freely.** An undefined tool degrades gracefully — the briefing says the
-capability is unavailable rather than fabricating data. A registry with three honest
-tools beats one with eight aspirational ones.
+**Answer `none` freely.** An undefined tool degrades gracefully: the briefing says the
+capability is unavailable rather than inventing data.
 
-> **The one thing to get right:** when it reaches the **logs** group, set the provider to
-> **`clog`**. The shipped example config uses the placeholder `logTool`, and if that
-> value survives into your real config the slot silently resolves to nothing. See the
-> naming gotcha in [INTEGRATION.md](INTEGRATION.md#seam-1--clog-is-the-shared-write-target).
-
-Verify:
+> **When it reaches the `logs` group, set the provider to `clog`.** The shipped example
+> config uses the placeholder `logTool`, and if that value survives into your real
+> config the slot resolves to nothing and your log data quietly vanishes from every
+> briefing. See the naming gotcha in
+> [INTEGRATION.md](INTEGRATION.md#seam-1--clog-is-the-shared-write-target).
 
 ```bash
-jq '.tools' ~/.config/pm/config.json
+VERIFY: jq -r '.tools | to_entries[] | "\(.key) -> \(.value.provider)"' ~/.config/pm/config.json
+EXPECT: real provider names; no "logTool", no "todoApp"
 ```
 
-### Day 2 — onboard one project
+Restart the session again — `/pm-generate` renders new skill files.
 
-Pick your **longest-running** project — the one you context-switch away from and lose
-the thread on. That's where handoffs pay.
+### Onboard one project
 
-```
-cd <that project>
-/pm-init
-```
+Pick the longest-running one — the project you context-switch away from and lose the
+thread on. That's where handoffs pay.
 
-It scaffolds `.pm/config.json`, `CONTEXT.md`, `CALENDAR.md`, `meetings.jsonl`, and flows
-straight into `/pm-start`.
-
-### Days 2–5 — run the lifecycle
-
-```
-/pm-start     once, at session open      — live sync, full briefing
-/pm-status    anytime, rerunnable        — cache-only, no network
-/pm-end       when you stop              — handoff block into LAST-SESSION.md
+```bash
+RUN:    cd <that project> && echo "/pm-init"
+VERIFY: ls .pm/config.json CONTEXT.md CALENDAR.md meetings.jsonl briefs
+EXPECT: all present
 ```
 
-Hand-populate `collaborators` in `.pm/config.json` as you go — it's a local lookup index
-so agents can resolve a teammate's handle without an MCP call. It is never used to
-message anyone.
+### Run the lifecycle
+
+| Command | When | What it does |
+| --- | --- | --- |
+| `/pm-start` | once, at session open | live sync, full briefing |
+| `/pm-status` | anytime | cache-only, no network |
+| `/pm-end` | when you stop | handoff block into `LAST-SESSION.md` |
+
+Populate `collaborators` in `.pm/config.json` by hand as you go — a local lookup index
+so agents resolve a teammate's handle without an MCP call. Nobody is ever messaged
+from it.
 
 ### ✅ Checkpoint
 
-**Open a session with `/pm-start` after two days away. Do you know where you left off
-without re-reading the diff?**
+**After two days away, does `/pm-start` tell you where you left off without re-reading
+the diff?**
 
-If not, your `/pm-end` handoffs are too terse. The blocks want *current state / open
-threads / next-up / blockers* — the next-up line is the one that does the work.
+If not, the `/pm-end` handoffs are too terse. The blocks want *current state / open
+threads / next-up / blockers* — next-up does most of the work.
 
 ---
 
-## You're done — the loop closes
-
-Now run the thing that makes the whole toolkit compound:
+## Closing the loop
 
 ```
 /clog-lessons
 ```
 
-It reads your `LEARNING` entries — the ones the `/dev` family, orchestrate, and your own
-manual logging have been accumulating for four weeks — clusters them by `family` + `kpi`,
-and proposes **concrete diffs** to your `CLAUDE.md` and skill files.
+It reads the `LEARNING` entries the other three tools have been accumulating as a side
+effect of working, clusters them, and proposes concrete diffs to your `CLAUDE.md` and
+skills. It never auto-applies.
 
-It never auto-applies. You read the diffs and take what's right.
+A rhythm that holds up:
 
-That's the loop: the system that improves your prompts is reading data you produced as a
-side effect of working.
-
-### A weekly rhythm that works
-
-```
-Daily     /pm-start … work … /pm-end
-Friday    /clog-sweep (audit) → /clog-sweep (backfill) → /clog-lessons → /clog-week
-```
+| When | What |
+| --- | --- |
+| Daily | `/pm-start` … work … `/pm-end` |
+| Friday | `/clog-sweep` (audit), `/clog-sweep` (backfill), `/clog-lessons`, `/clog-week` |
 
 ---
 
 ## Troubleshooting
 
-**A slash command doesn't appear.** Confirm the symlink exists under
-`~/.claude/skills/`, then restart the Claude Code session — skills are scanned at start.
+**A slash command doesn't appear.** Confirm the symlink under `~/.claude/skills/`, then
+restart the session — skills are scanned at start.
 
-**`/orchestrate` fast-fails on `[TODO]`.** A resolved agent still has a placeholder in
-its persona line or work step. Edit `prompts/agents/local/<name>.md`, or run
-`/orchestrate-agent` for a guided walkthrough.
+**`clog: command not found`.** `~/.local/bin` isn't on your PATH. See stage 1.
 
-**pm's briefing says a capability is unavailable.** That's the graceful-degradation path,
-not an error — the named tool has no provider, or the provider is `none`/blank. Check
-`jq '.tools' ~/.config/pm/config.json`; re-run `/pm-generate` to change a mapping.
+**Log entries stopped appearing.** `echo $CLOG_DISABLE` — unset it if a CI or
+automation run left it exported.
 
-**Log entries stopped appearing.** Check `CLOG_DISABLE` isn't still exported from a CI
-or automation run: `echo $CLOG_DISABLE` → `unset CLOG_DISABLE`.
+**`/dev-tab` errors.** Needs [`herdr`](https://herdr.dev) and `HERDR_ENV=1`. `/dev`,
+`/dev-sa`, and `/dev-sa-q` have no herdr dependency.
 
-**An installer says "already exists — skipping."** Working as designed; none of them
-overwrite. Remove the target under `~/.claude/skills/` by hand and re-run to relink.
-
-**`/dev-tab` errors.** It needs `herdr` and `HERDR_ENV=1`. `/dev`, `/dev-sa`, and
-`/dev-sa-q` have no herdr dependency — use those.
+**The installer skipped a repo.** Check its summary: a skipped symlink means something
+was already there, and a failed repo names the reason. Nothing is overwritten.
