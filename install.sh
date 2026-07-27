@@ -146,12 +146,21 @@ prompt_yn() {
 
 selected() {
   [[ -z "$ONLY" ]] && return 0
-  local want
+  local want w
   IFS=',' read -ra want <<< "$ONLY"
-  for w in "${want[@]}"; do
+  for w in "${want[@]+"${want[@]}"}"; do
     [[ "${w// /}" == "$1" ]] && return 0
   done
   return 1
+}
+
+# True when two paths name the same directory after resolving symlinked components,
+# so a checkout reached via /tmp and via /private/tmp is recognised as one place.
+same_dir() {
+  local a b
+  a="$(cd -P "$1" 2>/dev/null && pwd -P)" || return 1
+  b="$(cd -P "$2" 2>/dev/null && pwd -P)" || return 1
+  [[ "$a" == "$b" ]]
 }
 
 # Symlink a directory into place, clobbering nothing. A real directory is a
@@ -160,9 +169,15 @@ selected() {
 # idempotent. Returns non-zero on refusal or failure so the caller can report it.
 link_dir() {
   local src="$1" dst="$2" current
+  # ln -sfn will happily create a link to nothing, and the result is a live entry in
+  # the skills dir that resolves to whatever someone later puts at that path.
+  if [[ ! -d "$src" ]]; then
+    warn "no such directory: $src — refusing to create a dangling link at $dst"
+    return 1
+  fi
   if [[ -L "$dst" ]]; then
     current="$(readlink "$dst")"
-    if [[ "$current" == "$src" ]]; then
+    if [[ "$current" == "$src" ]] || same_dir "$current" "$src"; then
       say "already linked: $dst"
       return 0
     fi
@@ -253,12 +268,12 @@ run_installer() {
   bash "$script" "$@"
 }
 
-# Mirrors clog's own detect_existing_install so the two cannot disagree. When they
-# do, clog's setup exits telling the user to re-run with a flag this script never
-# exposed, and the whole run dies on the first repo.
+# An exact copy of the three probes in clog's own detect_existing_install. It is a
+# copy, so it CAN drift — re-check it against clog/setup.sh if that function changes.
+# When the two disagree, clog's setup exits telling the user to re-run with a flag
+# this script never exposed, and clog fails on the first repo.
 clog_installed() {
-  [[ -e "$HOME/.claude/hooks/clog.sh" ]] && return 0
-  [[ -e "$HOME/.config/clog/config.yaml" ]] && return 0
+  [[ -f "$HOME/.claude/hooks/clog.sh" ]] && return 0
   [[ -n "${CLOG_BIN:-}" ]] && return 0
   [[ -n "${AI_LOG_ROOT:-}" ]] && return 0
   return 1
@@ -267,13 +282,17 @@ clog_installed() {
 install_clog() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
-  # clog gates --migrate behind an explicit opt-in. Ask rather than answering for it.
+  # clog gates --migrate behind an explicit opt-in because it rewrites an existing
+  # install. Answering yes on the user's behalf is exactly what that gate exists to
+  # prevent, so --all declines it rather than auto-consenting.
   if clog_installed; then
     say "an existing clog install was detected."
-    if prompt_yn "Pass --migrate so clog's setup can update it (it backs up first)?" "y"; then
+    if $ASSUME_YES; then
+      say "--all does not auto-consent to rewriting it; re-run interactively to migrate"
+    elif prompt_yn "Pass --migrate so clog's setup can update it (it backs up first)?" "y"; then
       args+=(--migrate)
     else
-      say "continuing without --migrate — clog's setup will decline to overwrite it"
+      say "continuing without --migrate — clog's setup will stop and install nothing"
     fi
   fi
   # `|| return 1` is load-bearing: a function returns its LAST command's status, so
@@ -287,15 +306,14 @@ install_clog() {
 # linked alongside them because they resolve it by path.
 install_dev_prompter() {
   local dir="$1" s refused=0
+  # One list, used for both the loop and the counts below — a hardcoded total silently
+  # breaks the all-refused check the moment a skill is added or removed.
+  local skills=(_devkit dev dev-tab dev-sa dev-sa-q dev-tab-q pr-review)
   run mkdir -p "$SKILLS_DIR" "$AGENTS_DIR"
-  for s in _devkit dev dev-tab dev-sa dev-sa-q dev-tab-q pr-review; do
-    if [[ ! -d "$dir/skills/$s" ]]; then
-      warn "$dir/skills/$s is missing upstream — not linking a dangling path"
-      refused=$((refused + 1))
-      continue
-    fi
-    # Collisions are survivable and must not abort the remaining repos, so the
-    # refusal is counted and reported rather than raised.
+  for s in "${skills[@]}"; do
+    # Collisions and missing sources are survivable and must not abort the remaining
+    # repos, so refusals are counted and reported rather than raised. link_dir
+    # rejects a missing source itself.
     link_dir "$dir/skills/$s" "$SKILLS_DIR/$s" || refused=$((refused + 1))
   done
 
@@ -303,18 +321,27 @@ install_dev_prompter() {
   if [[ -e "$personas" ]]; then
     say "$personas already exists — left as-is"
     NOTES+=("dev-prompter: if you want its task personas, merge them from $dir/agents/personas.md into $personas")
-  else
-    run cp "$dir/agents/personas.md" "$personas"
+  elif [[ ! -f "$dir/agents/personas.md" ]]; then
+    warn "$dir/agents/personas.md is missing upstream — skipping personas"
+    refused=$((refused + 1))
+  elif run cp "$dir/agents/personas.md" "$personas"; then
     say "installed: $personas"
+  else
+    warn "failed to copy personas into $personas"
+    refused=$((refused + 1))
   fi
 
-  # Nothing linked at all is a failure, not a caveat.
-  if (( refused == 7 )); then
+  # Nothing landing at all is a failure, not a caveat.
+  if (( refused > ${#skills[@]} )); then
+    warn "nothing could be installed into $SKILLS_DIR"
+    return 1
+  fi
+  if (( refused == ${#skills[@]} )); then
     warn "no skills could be linked into $SKILLS_DIR"
     return 1
   fi
   if (( refused > 0 )); then
-    PARTIAL+=("dev-prompter: $refused of 7 links skipped — the rest are in place")
+    PARTIAL+=("dev-prompter: $refused of $(( ${#skills[@]} + 1 )) items skipped — the rest are in place")
   fi
 }
 
@@ -421,6 +448,17 @@ summary() {
   echo ""
 }
 trap summary EXIT
+
+# Ctrl-C must actually stop the run. Without this the interrupted installer's death
+# was swallowed and the remaining repos installed anyway — the opposite of what the
+# person pressing Ctrl-C asked for. Exiting here still fires the EXIT trap, so the
+# summary reports whatever already landed.
+on_interrupt() {
+  echo "" >&2
+  warn "interrupted — stopping here."
+  exit 130
+}
+trap on_interrupt INT
 
 # ── The walkthrough skill ───────────────────────────────────────────────────────
 # Linked regardless of which repos were chosen: it is this repo's own skill, and it is
