@@ -373,8 +373,17 @@ fi
 # Consent cannot be inferred from silence. Without a terminal there is nobody to ask,
 # so the only non-interactive path is an explicit --all.
 if [[ ! -t 0 ]] && ! $ASSUME_YES; then
-  fail "no terminal to prompt on. Re-run with --all to accept every offered repo,
-       optionally narrowed with --only clog,pm — nothing is installed by default."
+  # The wording matters: an earlier version called --only "optional" here, and that
+  # steered unattended callers into installing all four when they wanted one.
+  fail "no terminal to prompt on, so consent cannot be collected.
+
+       --all stands in for typed consent, and on its own it accepts ALL FOUR repos.
+       Pair it with --only to say what you actually want:
+
+         ./install.sh --all --only clog
+         ./install.sh --all --only clog,dev-prompter
+
+       Use --all by itself only if you genuinely want every repo."
 fi
 
 info "Checking prerequisites..."

@@ -22,8 +22,18 @@ Four rules, in priority order. They override any convenience below.
 4. **Stop means stop.** At any checkpoint, "this is enough" is a successful outcome.
    Summarise and finish. Do not re-pitch the remaining tools.
 
-Never run `install.sh --all` — it accepts everything. Always `--only` with exactly what
-was agreed.
+**`--only` is mandatory on every invocation**, even when only one tool was agreed.
+
+`--all` on its own accepts all four — never run it bare. But an agent session has no
+terminal, and the installer refuses to prompt without one, so `--all` is also the only
+way to proceed at all. Treat it as a stand-in for typed consent, never as a selection:
+
+```bash
+./install.sh --all --only clog                  # installs clog, nothing else
+./install.sh --all --only clog,dev-prompter
+```
+
+If you cannot pass `--only`, stop and ask rather than dropping it.
 
 ## Step 0 — find out what's already there
 
@@ -31,14 +41,24 @@ Run this before asking anything; it changes what's worth offering, and it makes 
 walkthrough resumable mid-way.
 
 ```bash
-command -v clog >/dev/null && echo "clog: installed" || echo "clog: no"
-ls ~/.claude/skills 2>/dev/null | grep -qx pr-review && echo "dev-prompter: installed" || echo "dev-prompter: no"
-ls ~/.claude/skills 2>/dev/null | grep -qx orchestrate && echo "orchestrate: installed" || echo "orchestrate: no"
-ls ~/.claude/skills 2>/dev/null | grep -qx pm-generate && echo "pm: installed" || echo "pm: no"
+SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+command -v clog >/dev/null && echo "clog: on PATH" || echo "clog: no"
+# _devkit, not pr-review — pr-review can come from elsewhere and false-positives.
+ls "$SKILLS_DIR" 2>/dev/null | grep -qx _devkit    && echo "dev-prompter: installed" || echo "dev-prompter: no"
+ls "$SKILLS_DIR" 2>/dev/null | grep -qx orchestrate && echo "orchestrate: installed" || echo "orchestrate: no"
+ls "$SKILLS_DIR" 2>/dev/null | grep -qx pm-generate && echo "pm: installed" || echo "pm: no"
 ```
 
-Also resolve where the repos live (`~/Code` unless they used `--root`) and confirm
-`bash`, `git`, and — only if pm is wanted — `jq`.
+**"installed" is a branch, not a skip.** Confirm it belongs to this profile
+(`ls ~/.claude/hooks/clog.sh`, `echo "$CLOG_BIN $AI_LOG_ROOT"`) and say so. A
+pre-existing clog needs `--migrate`, which `--all` deliberately refuses — that stage
+has to be run interactively by the person, not by you.
+
+Also resolve where the repos live and **carry that root into every command** as
+`--root <path>`; without it the installer clones duplicates into `~/Code`.
+
+Prerequisites: `bash` and `git` always. `jq` is hard-required for pm **and** used by
+clog's retro skills (`/clog-week`, `/clog-sweep`) — flag it for anyone taking clog.
 
 ## Step 1 — ask what problem they have
 
@@ -59,18 +79,23 @@ clog goes first and pm last, and that stopping partway is fine.
 
 For each agreed tool, in the order clog → dev-prompter → orchestrate → pm:
 
-1. **Install** — `./install.sh --only <name>` from the toolkit repo.
-2. **Verify** — run that stage's `VERIFY` from ONBOARDING.md and check the output
-   against its `EXPECT`. Report what actually came back, not what should have.
-3. **Configure** — walk the stage's decision points (below). Ask each one; never pick
+1. **Preview** — run the install command with `--dry-run` and show them the output. It
+   writes nothing and executes no installer, so it is safe before consent. Offer
+   `--preview` (which runs each repo's own dry-run, executing their code) only if they
+   have said they trust the repos.
+2. **Install** — `./install.sh --all --only <name> [--root <resolved root>]`.
+3. **Verify** — run that stage's `VERIFY` from ONBOARDING.md and compare against its
+   `EXPECT`. Report what actually came back, not what should have. The summary's
+   `Installed:` line reflects exit codes, not working tools — judge on the VERIFY.
+4. **Configure** — walk the stage's decision points (below). Ask each one; never pick
    for them.
-4. **Use it once** — the stage's first real command, so the checkpoint has something to
+5. **Use it once** — the stage's first real command, so the checkpoint has something to
    judge.
-5. **Checkpoint** — ask the stage's question. Then ask whether to continue, stop, or
+6. **Checkpoint** — ask the stage's question. Then ask whether to continue, stop, or
    come back later. Honour the answer.
 
 If a verify fails, fix it before moving on. The installer's summary names skipped
-symlinks and failed repos — read it rather than assuming success.
+symlinks and failed repos — read it, but treat the VERIFY as the authority.
 
 ### Decision points to ask, never assume
 

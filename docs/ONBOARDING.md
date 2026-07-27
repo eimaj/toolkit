@@ -31,11 +31,12 @@ adds a step to a loop that already works without it.
 ## Before you start
 
 ```bash
-command -v bash git    # required
-command -v jq          # only if you want pm
+command -v bash && command -v git    # required
+command -v jq                        # required for pm, used by clog's retro skills
 ```
 
-Missing `jq`: `brew install jq`, or skip pm. Missing `git` or `bash`: stop here.
+Missing `jq`: `brew install jq`. pm won't install without it, and clog's `/clog-week`
+and `/clog-sweep` need it too. Missing `git` or `bash`: stop here.
 
 ---
 
@@ -61,7 +62,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && exec zsh
 Then set `log_root` to somewhere you'll actually look:
 
 ```bash
-RUN:    $EDITOR ~/.config/clog/config.yaml
+RUN:    ${EDITOR:-vi} ~/.config/clog/config.yaml
 VERIFY: grep '^log_root:' ~/.config/clog/config.yaml
 EXPECT: a path you recognise
 ```
@@ -79,7 +80,7 @@ clog LEARNING "why that attempt failed" --family tooling --kpi failure
 Commits, pushes, and PRs are logged by hooks — don't log those by hand.
 
 ```bash
-VERIFY: ls "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"')"
+VERIFY: ls "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"' | sed "s|^~|$HOME|")"
 EXPECT: a YYYYMMDD.jsonl file with today's date
 ```
 
@@ -91,8 +92,8 @@ instead of leaving you to remember. clog's `setup.sh` offers this; if you declin
 ```bash
 RUN:    less $TK/clog/persona/PERSONA.md      # read it first — it edits agent behaviour
 RUN:    cat $TK/clog/persona/PERSONA.md >> ~/.claude/CLAUDE.md
-VERIFY: grep -c 'Ledger' ~/.claude/CLAUDE.md
-EXPECT: 1 or more (run it twice and you get a duplicate block)
+VERIFY: grep -c '^# Ledger' ~/.claude/CLAUDE.md
+EXPECT: exactly 1 — a 2 means the block was appended twice; delete the duplicate
 ```
 
 ### Retro
@@ -126,7 +127,7 @@ document is for people who also want the delegation, review, and project layers.
 
 ```bash
 RUN:    cd $TK/toolkit && ./install.sh --only dev-prompter
-VERIFY: ls ~/.claude/skills | grep -E '^(dev|dev-sa|dev-sa-q|dev-tab|dev-tab-q|pr-review|_devkit)$' | wc -l
+VERIFY: ls ~/.claude/skills | grep -Ec '^(dev|dev-sa|dev-sa-q|dev-tab|dev-tab-q|pr-review|_devkit)$'
 EXPECT: 7
 ```
 
@@ -164,8 +165,9 @@ five lenses, severity-ranked, advisory, never posts and never blocks.
 Then try `/pr-review` standalone on a diff you were about to push anyway.
 
 ```bash
-VERIFY: grep -c LEARNING "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"')"/$(date +%Y%m%d).jsonl
-EXPECT: 1 or more, if clog is installed — the learn step closes every /dev cycle
+VERIFY: grep -c LEARNING "$(grep '^log_root:' ~/.config/clog/config.yaml | awk '{print $2}' | tr -d '"' | sed "s|^~|$HOME|")"/$(date +%Y%m%d).jsonl
+EXPECT: 1 or more once a /dev cycle has run today. "No such file" means no entries
+        yet, not a failure. Skip this if you didn't install clog.
 ```
 
 ### ✅ Checkpoint
@@ -188,7 +190,7 @@ multi-phase work and long-running projects respectively.
 
 ```bash
 RUN:    cd $TK/toolkit && ./install.sh --only orchestrate
-VERIFY: ls ~/.claude/skills | grep -c '^orchestrate'
+VERIFY: ls ~/.claude/skills | grep -Ecx 'orchestrate|orchestrate-brief|orchestrate-recipe|orchestrate-agent'
 EXPECT: 4
 ```
 
@@ -306,9 +308,11 @@ Restart the session again — `/pm-generate` renders new skill files.
 Pick the longest-running one — the project you context-switch away from and lose the
 thread on. That's where handoffs pay.
 
+`cd` into that project, then run `/pm-init` **in Claude Code** — it's a skill, not a
+shell command.
+
 ```bash
-RUN:    cd <that project> && echo "/pm-init"
-VERIFY: ls .pm/config.json CONTEXT.md CALENDAR.md meetings.jsonl briefs
+VERIFY: ls -d .pm/config.json CONTEXT.md CALENDAR.md meetings.jsonl reports briefs
 EXPECT: all present
 ```
 
