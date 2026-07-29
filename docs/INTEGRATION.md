@@ -200,7 +200,11 @@ Things all four assume, worth knowing once:
   repo directory there (clog, orchestrate, pm's `pm-generate`, dev-prompter) or render
   real files (pm's generated `pm-init`/`pm-start`/`pm-status`/`pm-end`).
 - **Symlinks track the repo.** Pull the repo, get the new skill version — with the one
-  exception of pm's rendered skills, which need a `/pm-generate` re-run.
+  exception of pm's rendered skills, which need a `/pm-generate` re-run. The flip side
+  is worth knowing before it surprises anyone: a `git pull` in a linked checkout
+  rewrites standing agent instructions, with no diff shown and nothing to re-run. That
+  is the trade for not silently going stale. Read the log before pulling if the skills
+  are load-bearing, or copy the directories instead of linking them to pin them.
 - **Personal config is gitignored and lives outside the repo** —
   `~/.config/clog/config.yaml`, `~/.config/pm/config.json`. orchestrate is the odd one
   out: its `config.json` sits in the repo root, gitignored.
