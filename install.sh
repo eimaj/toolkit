@@ -463,10 +463,7 @@ fi
 # ── Summary ─────────────────────────────────────────────────────────────────────
 # On a trap so a mid-run abort still reports what already landed and what is left to
 # do. Without it a failure on the last repo threw away every earlier repo's notes.
-SUMMARY_PRINTED=false
 summary() {
-  $SUMMARY_PRINTED && return 0
-  SUMMARY_PRINTED=true
   local verb="Installed"
   $DRY_RUN && verb="Would install"
   info "Done."
