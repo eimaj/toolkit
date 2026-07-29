@@ -156,13 +156,10 @@ prompt_yn() {
   [[ "$reply" =~ ^[Yy] ]]
 }
 
+# Reads SELECTED, which the preflight resolves once. Repo names carry no spaces or
+# glob characters, so the substring test is exact.
 selected() {
-  [[ -z "$ONLY" ]] && return 0
-  local want w
-  IFS=',' read -ra want <<< "$ONLY"
-  for w in "${want[@]+"${want[@]}"}"; do
-    [[ "${w// /}" == "$1" ]] && return 0
-  done
+  case " ${SELECTED[*]+${SELECTED[*]}} " in *" $1 "*) return 0 ;; esac
   return 1
 }
 
@@ -434,19 +431,23 @@ command -v gh >/dev/null 2>&1 && say "gh: $(command -v gh)" || warn "gh not foun
 say "clone root: $ROOT"
 say "skills dir: $SKILLS_DIR"
 
-# Validation and selection must agree, so both split on comma only. Splitting on
-# whitespace here let '--only "clog pm"' validate and then match nothing.
+# --only is resolved into SELECTED once, here, and only read afterwards. Validating and
+# matching in two places meant they could disagree on the separator, and they did:
+# '--only "clog pm"' passed validation and then matched nothing. Valid names come from
+# ORDER, so adding a repo cannot leave a stale list behind.
+SELECTED=("${ORDER[@]}")
 if [[ -n "$ONLY" ]]; then
-  IFS=',' read -ra _only_check <<< "$ONLY"
-  _matched=0
-  for w in "${_only_check[@]+"${_only_check[@]}"}"; do
-    case "${w// /}" in
-      "") ;;
-      clog|dev-prompter|orchestrate|pm) _matched=$((_matched + 1)) ;;
-      *) fail "--only: unknown repo '$w' (valid: clog, dev-prompter, orchestrate, pm)" ;;
+  SELECTED=()
+  IFS=',' read -ra _want <<< "$ONLY"
+  for w in "${_want[@]+"${_want[@]}"}"; do
+    w="${w// /}"
+    [[ -n "$w" ]] || continue
+    case " ${ORDER[*]} " in
+      *" $w "*) SELECTED+=("$w") ;;
+      *) fail "--only: unknown repo '$w' (valid: ${ORDER[*]})" ;;
     esac
   done
-  (( _matched > 0 )) || fail "--only matched no repos (valid: clog, dev-prompter, orchestrate, pm)"
+  (( ${#SELECTED[@]} > 0 )) || fail "--only matched no repos (valid: ${ORDER[*]})"
 fi
 
 # jq is checked before anything is installed rather than inside pm, so a jq-less run
