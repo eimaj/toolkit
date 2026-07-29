@@ -14,7 +14,8 @@
 #   --preview  additionally runs each tool's own --dry-run, which means EXECUTING code
 #              from those repos. Better preview, real trust cost — hence opt-in.
 #
-# Usage: ./install.sh [--all] [--dry-run|--preview] [--root DIR] [--only a,b,c] [--help]
+# Usage: ./install.sh [--all] [--dry-run|--preview] [--root DIR] [--only a,b,c]
+#                     [--ref TAG|SHA] [--help]
 
 set -euo pipefail
 
@@ -29,6 +30,7 @@ DRY_RUN=false
 PREVIEW=false
 ASSUME_YES=false
 ONLY=""
+REF=""
 
 # Install order is load-bearing — see docs/INTEGRATION.md.
 ORDER=(clog dev-prompter orchestrate pm)
@@ -72,6 +74,10 @@ Usage: ./install.sh [options]
                     no terminal to prompt on (CI, pipes, agents).
   --only a,b,c      Consider only these repos (clog, dev-prompter, orchestrate, pm).
   --root DIR        Where to clone repos. Default: ~/Code
+  --ref TAG|SHA     Check out this revision in repos this run clones, instead of
+                    whatever their default branch points at. Existing clones are
+                    left alone, so it does not apply to them. Either way the
+                    resolved commit is printed before that repo's installer runs.
   --dry-run         Change nothing and run nothing. Prints what this script would do.
                     Safe to use on a repo you have not read yet.
   --preview         Everything --dry-run does, and additionally runs each tool's own
@@ -102,6 +108,8 @@ while [[ $# -gt 0 ]]; do
     --root=*)  ROOT="${1#*=}"; [[ -n "$ROOT" ]] || { echo "--root needs a directory" >&2; exit 1; }; shift ;;
     --only)    ONLY="${2:?--only needs a comma-separated list}"; shift 2 ;;
     --only=*)  ONLY="${1#*=}"; [[ -n "$ONLY" ]] || { echo "--only needs a comma-separated list" >&2; exit 1; }; shift ;;
+    --ref)     REF="${2:?--ref needs a tag, branch, or SHA}"; shift 2 ;;
+    --ref=*)   REF="${1#*=}"; [[ -n "$REF" ]] || { echo "--ref needs a tag, branch, or SHA" >&2; exit 1; }; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -115,6 +123,10 @@ ROOT="${ROOT/#\~/$HOME}"
 # every git invocation below also uses -- to end option parsing.
 # Inline echo/exit rather than fail(): the helpers are not defined until below.
 [[ "$ROOT" != -* ]] || { echo "ERROR: --root must be a path, not an option: $ROOT" >&2; exit 1; }
+
+# $REF reaches git checkout's positional slot and needs the same treatment as $ROOT:
+# a leading dash there is read as a flag, not a revision.
+[[ "$REF" != -* ]] || { echo "ERROR: --ref must be a tag, branch, or SHA, not an option: $REF" >&2; exit 1; }
 
 say()   { echo "  $*"; }
 info()  { echo ""; echo "==> $*"; }
@@ -230,6 +242,9 @@ ensure_clone() {
       fi
     fi
     say "found existing clone: $dest (left untouched — pull it yourself if you want)"
+    # Leaving existing clones alone is deliberate, so --ref has nothing to act on here.
+    # Saying so is better than pinning silently failing.
+    [[ -z "$REF" ]] || warn "--ref $REF not applied — an existing clone is left as it is"
   elif [[ -e "$dest" ]]; then
     warn "$dest exists but is not a git clone — skipping $name"
     return 1
@@ -239,6 +254,23 @@ ensure_clone() {
     if ! run git clone --quiet -- "$url" "$dest"; then
       warn "clone failed for $name"
       return 1
+    fi
+    # Detached on purpose: a pinned install should not look like it is on a branch
+    # that a later pull would move.
+    if [[ -n "$REF" ]] && ! run git -C "$dest" checkout --quiet --detach "$REF"; then
+      warn "could not check out --ref $REF in $dest"
+      return 1
+    fi
+  fi
+
+  # The origin check above says WHERE this code came from. Nothing so far says WHAT it
+  # says, and the next step executes it — so name the exact commit first.
+  if [[ -d "$dest/.git" ]]; then
+    local sha
+    if sha="$(git -C "$dest" rev-parse --short HEAD 2>/dev/null)"; then
+      say "commit: $sha"
+    else
+      warn "could not resolve HEAD in $dest"
     fi
   fi
   RESOLVED_DIR="$dest"
