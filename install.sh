@@ -348,7 +348,7 @@ install_dev_prompter() {
   # One list, used for both the loop and the counts below — a hardcoded total silently
   # breaks the all-refused check the moment a skill is added or removed.
   local skills=(_devkit dev dev-tab dev-sa dev-sa-q dev-tab-q pr-review)
-  run mkdir -p "$SKILLS_DIR" "$AGENTS_DIR"
+  run mkdir -p -- "$SKILLS_DIR" "$AGENTS_DIR"
   for s in "${skills[@]}"; do
     # Collisions and missing sources are survivable and must not abort the remaining
     # repos, so refusals are counted and reported rather than raised. link_dir
@@ -513,7 +513,7 @@ trap on_interrupt INT
 # what a person runs to be walked through the rest.
 info "toolkit-setup — the interactive walkthrough (/toolkit-setup)"
 if prompt_yn "Link the walkthrough skill into ${SKILLS_DIR}?" "y"; then
-  run mkdir -p "$SKILLS_DIR"
+  run mkdir -p -- "$SKILLS_DIR"
   if link_dir "$SELF/skills/toolkit-setup" "$SKILLS_DIR/toolkit-setup"; then
     NOTES+=("run /toolkit-setup in Claude Code to be walked through the tools you picked")
   fi
