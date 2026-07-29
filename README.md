@@ -86,8 +86,8 @@ Full detail, plus the gotchas worth knowing before they bite:
 ## Install
 
 ```bash
-git clone https://github.com/eimaj/toolkit ~/Code/toolkit
-cd ~/Code/toolkit
+git clone https://github.com/eimaj/ai-toolkit ~/Code/ai-toolkit
+cd ~/Code/ai-toolkit
 ./install.sh
 ```
 
