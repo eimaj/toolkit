@@ -381,18 +381,24 @@ install_dev_prompter() {
   fi
 }
 
-install_orchestrate() {
+# orchestrate and pm install identically — run the repo's own install.sh, forwarding
+# --dry-run when set. Only their post-install notes differ, so only those stay separate.
+install_delegated() {
   local dir="$1" args=()
   $DRY_RUN && args+=(--dry-run)
-  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}" || return 1
+  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}"
+}
+
+install_orchestrate() {
+  local dir="$1"
+  install_delegated "$dir" || return 1
   NOTES+=("orchestrate: set artifact_root in $dir/config.json")
   NOTES+=("orchestrate: copy a recipe and the agents it names into recipes/local/ and prompts/agents/local/ — code-writer's three run as shipped; feature-scoper's carry [TODO] personas and fast-fail until filled in")
 }
 
 install_pm() {
-  local dir="$1" args=()
-  $DRY_RUN && args+=(--dry-run)
-  run_installer "$dir/install.sh" "${args[@]+"${args[@]}"}" || return 1
+  local dir="$1"
+  install_delegated "$dir" || return 1
   NOTES+=("pm: run /pm-generate in Claude Code — and when it reaches the 'logs' group, set the provider to 'clog' (the example config's placeholder is 'logTool')")
 }
 
