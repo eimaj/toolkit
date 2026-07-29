@@ -192,7 +192,14 @@ link_dir() {
     warn "failed to link $dst"
     return 1
   fi
-  say "linked: $dst -> $src"
+  # run() executes nothing in dry-run and still returns 0, so an unconditional
+  # "linked:" here asserted a symlink that was never created — and the walkthrough
+  # shows this output to the user as the preview they consent from.
+  if $DRY_RUN; then
+    say "would link: $dst -> $src"
+  else
+    say "linked: $dst -> $src"
+  fi
 }
 
 # Sets RESOLVED_DIR rather than echoing it — progress output goes to the user, so
