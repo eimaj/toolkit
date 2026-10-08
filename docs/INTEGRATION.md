@@ -113,7 +113,7 @@ encode the handoff — every `/dev` skill carries a routing gate that sends you 
 | One scoped change you'll eyeball yourself | `/dev-sa-q` or `/dev-tab-q` |
 | One scoped change you want reviewed | `/dev`, `/dev-sa`, or `/dev-tab` |
 | Multi-phase (write → review → retro), or you expect reviewer pushback | `/orchestrate` |
-| Large or parallel, and you want explicit file scoping first | `/orchestrate-brief` → `/orchestrate` |
+| Large or parallel, and you want explicit file scoping first | `/orchestrate-spec` → `/orchestrate` |
 
 Pick the **surface** by how you want to interact (inline / separate pane / one-shot
 subagent) and the **cycle** by whether you want it reviewed. The `-q` suffix is always
@@ -128,7 +128,7 @@ words.
 
 ## Seam 4 — pm hands briefs to orchestrate
 
-`/orchestrate-brief` writes `brief.md` to orchestrate's global
+`/orchestrate-spec` writes `brief.md` to orchestrate's global
 `{artifact_root}/runs/<run-id>/`. That's fine for a one-off, but a brief for a
 long-running project belongs *with* the project.
 

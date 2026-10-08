@@ -190,7 +190,7 @@ multi-phase work and long-running projects respectively.
 
 ```bash
 RUN:    cd $TK/toolkit && ./install.sh --only orchestrate
-VERIFY: ls ~/.claude/skills | grep -Ecx 'orchestrate|orchestrate-brief|orchestrate-recipe|orchestrate-agent'
+VERIFY: ls ~/.claude/skills | grep -Ecx 'orchestrate|orchestrate-spec|orchestrate-recipe|orchestrate-agent'
 EXPECT: 4
 ```
 
@@ -253,7 +253,7 @@ even when the run fails — especially read that one.
 **Did the retro say something the diff didn't?**
 
 If it reads like a restatement of the changes, the `brief.md` was too thin — vague
-acceptance criteria leave nothing concrete to reflect against. Run `/orchestrate-brief`
+acceptance criteria leave nothing concrete to reflect against. Run `/orchestrate-spec`
 first next time for explicit file scoping and sharper criteria.
 
 **🚏 Off-ramp:** stage 4 is only worth it for projects you return to across many

@@ -19,7 +19,7 @@ a missing tool degrades instead of breaking.
 | --- | --- | --- |
 | [**clog**](https://github.com/eimaj/clog) | `/clog`, `/clog-sweep`, `/clog-day`, `/clog-week`, `/clog-lessons`, `/clog-replay`, `/clog-search` | Structured JSONL session logging + retro skills. The substrate the other three write into. |
 | [**dev-prompter**](https://github.com/eimaj/dev-prompter) | `/dev`, `/dev-tab`, `/dev-sa`, `/dev-sa-q`, `/dev-tab-q`, `/pr-review` | Delegating a dev task on a 4-part prompt contract (model / persona / request / deliverable), and the multi-lens review engine. |
-| [**orchestrate**](https://github.com/eimaj/orchestrate) | `/orchestrate`, `/orchestrate-brief`, `/orchestrate-recipe`, `/orchestrate-agent` | Multi-agent write → review → retro runs against a brief, with auditable artifacts. |
+| [**orchestrate**](https://github.com/eimaj/orchestrate) | `/orchestrate`, `/orchestrate-spec`, `/orchestrate-recipe`, `/orchestrate-agent` | Multi-agent write → review → retro runs against a brief, with auditable artifacts. |
 | [**project-manager** (`pm`)](https://github.com/eimaj/project-manager) | `/pm-generate` → renders `/pm-init`, `/pm-start`, `/pm-status`, `/pm-end` | Per-project context, live session sync, and clean multi-session handoffs. |
 
 ---
@@ -72,7 +72,7 @@ Four seams that actually exist:
 2. **`/pr-review` is the single review engine.** The `/dev` family calls it directly;
    orchestrate's reviewer agent is the heavier, artifact-producing alternative for the
    same job. You don't maintain two review rubrics.
-3. **pm hands briefs to orchestrate.** `/pm-end` relocates `/orchestrate-brief` output
+3. **pm hands briefs to orchestrate.** `/pm-end` relocates `/orchestrate-spec` output
    into the project's own `briefs_dir` and commits it, so a brief outlives the run.
 4. **Everything degrades.** Each seam is optional in one direction — no tool fails
    because another is missing. See the degradation matrix in
