@@ -338,13 +338,13 @@ install_clog() {
 }
 
 # dev-prompter ships no installer, so the documented symlink install lives here.
-# _devkit is the shared base the five /dev skills read, not a slash command; it is
+# _devkit is the shared base the three /dev skills read, not a slash command; it is
 # linked alongside them because they resolve it by path.
 install_dev_prompter() {
   local dir="$1" s refused=0
   # One list, used for both the loop and the counts below — a hardcoded total silently
   # breaks the all-refused check the moment a skill is added or removed.
-  local skills=(_devkit dev dev-tab dev-sa dev-sa-q dev-tab-q pr-review)
+  local skills=(_devkit dev dev-tab dev-sa pr-review)
   run mkdir -p -- "$SKILLS_DIR" "$AGENTS_DIR"
   for s in "${skills[@]}"; do
     # Collisions and missing sources are survivable and must not abort the remaining
