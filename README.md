@@ -18,7 +18,7 @@ a missing tool degrades instead of breaking.
 | Repo | Slash commands | Owns |
 | --- | --- | --- |
 | [**clog**](https://github.com/eimaj/clog) | `/clog`, `/clog-sweep`, `/clog-day`, `/clog-week`, `/clog-lessons`, `/clog-replay`, `/clog-search` | Structured JSONL session logging + retro skills. The substrate the other three write into. |
-| [**dev-prompter**](https://github.com/eimaj/dev-prompter) | `/dev`, `/dev-tab`, `/dev-sa`, `/dev-sa-q`, `/dev-tab-q`, `/pr-review` | Delegating a dev task on a 4-part prompt contract (model / persona / request / deliverable), and the multi-lens review engine. |
+| [**dev-prompter**](https://github.com/eimaj/dev-prompter) | `/dev`, `/dev-tab`, `/dev-sa`, `/pr-review` | Delegating a dev task on a 4-part prompt contract (model / persona / request / deliverable), and the multi-lens review engine. |
 | [**orchestrate**](https://github.com/eimaj/orchestrate) | `/orchestrate`, `/orchestrate-spec`, `/orchestrate-recipe`, `/orchestrate-agent` | Multi-agent write → review → retro runs against a brief, with auditable artifacts. |
 | [**project-manager** (`pm`)](https://github.com/eimaj/project-manager) | `/pm-generate` → renders `/pm-init`, `/pm-start`, `/pm-status`, `/pm-end` | Per-project context, live session sync, and clean multi-session handoffs. |
 
@@ -122,8 +122,7 @@ repo it expects. Existing skills and symlinks are never overwritten; collisions 
 skipped and reported at the end.
 
 **Requirements:** `bash`, `git`. Add `jq` if you want pm, `gh` for the GitHub-facing
-skills, and [`herdr`](https://herdr.dev) if you want dev-prompter's `/dev-tab` and
-`/dev-tab-q`. macOS / Linux / WSL.
+skills, and [`herdr`](https://herdr.dev) if you want dev-prompter's `/dev-tab`. macOS / Linux / WSL.
 
 ---
 
