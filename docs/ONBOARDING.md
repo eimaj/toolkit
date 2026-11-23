@@ -127,11 +127,11 @@ document is for people who also want the delegation, review, and project layers.
 
 ```bash
 RUN:    cd $TK/toolkit && ./install.sh --only dev-prompter
-VERIFY: ls ~/.claude/skills | grep -Ec '^(dev|dev-sa|dev-sa-q|dev-tab|dev-tab-q|pr-review|_devkit)$'
-EXPECT: 7
+VERIFY: ls ~/.claude/skills | grep -Ec '^(dev|dev-sa|dev-tab|pr-review|_devkit)$'
+EXPECT: 5
 ```
 
-Seven directories: five `/dev` skills, `pr-review`, and `_devkit` — a shared base the
+Five directories: three `/dev` skills, `pr-review`, and `_devkit` — a shared base the
 others read, not a slash command. Collisions are skipped, not overwritten, and named in
 the installer's summary; check there if the count is short.
 
@@ -142,11 +142,11 @@ Restart your Claude Code session — skills are scanned at start.
 
 ### Start with one command
 
-`/dev-sa-q` is the lowest-commitment surface: one-shot subagent, no review, keeps
-token-heavy reads out of your main session.
+`/dev-sa` is the lowest-commitment surface: one-shot subagent, keeps token-heavy reads
+out of your main session.
 
 ```
-/dev-sa-q find every call site of processPayment across this repo
+/dev-sa find every call site of processPayment across this repo
 ```
 
 Watch what it does with the four-part contract — **model / persona / request /
@@ -155,7 +155,7 @@ it changes the result more than anything else.
 
 ### Add the review step
 
-Drop the `-q` on a change that touches files. `/dev-sa` runs `/pr-review` afterward —
+On a change that touches files, `/dev-sa` runs `/pr-review` afterward —
 five lenses, severity-ranked, advisory, never posts and never blocks.
 
 ```
@@ -368,7 +368,7 @@ restart the session — skills are scanned at start.
 automation run left it exported.
 
 **`/dev-tab` errors.** Needs [`herdr`](https://herdr.dev) and `HERDR_ENV=1`. `/dev`,
-`/dev-sa`, and `/dev-sa-q` have no herdr dependency.
+and `/dev-sa` have no herdr dependency.
 
 **The installer skipped a repo.** Check its summary: a skipped symlink means something
 was already there, and a failed repo names the reason. Nothing is overwritten.

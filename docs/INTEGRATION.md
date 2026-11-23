@@ -40,12 +40,10 @@ with a common `session` value — not in `{artifact_root}/logs/`.
 
 ### dev-prompter → clog
 
-Every one of the five `/dev` skills ends its cycle with a **learn** step: a `clog`
+Every one of the three `/dev` skills ends its cycle with a **learn** step: a `clog`
 `LEARNING` or `LESSON` entry capturing anything surprising or reusable from the run.
 This is the only clog dependency in dev-prompter, and it's explicitly optional — if
 `clog` isn't installed, skip the step; nothing else in the toolkit breaks.
-
-The `-q` variants (`/dev-sa-q`, `/dev-tab-q`) skip the *review* step but **still log**.
 
 ### pm → clog
 
@@ -89,7 +87,6 @@ Both the light path and the heavy path converge on the same rubric.
 | --- | --- | --- |
 | `/dev`, `/dev-tab`, `/dev-sa` | calls `/pr-review` directly | no — advisory, in-session |
 | `/orchestrate` | its own `reviewer` agent step | yes — `learnings.md`, `retro.md` |
-| `/dev-sa-q`, `/dev-tab-q` | none (skipped by design) | no |
 
 `/pr-review` ships **inside dev-prompter** (`skills/pr-review/`), so installing
 dev-prompter gets you the review engine whether or not you use the `/dev` family. It is
@@ -109,15 +106,13 @@ encode the handoff — every `/dev` skill carries a routing gate that sends you 
 
 | The work is… | Use |
 | --- | --- |
-| A question, a search, a scan — no files change | `/dev-sa-q` |
-| One scoped change you'll eyeball yourself | `/dev-sa-q` or `/dev-tab-q` |
+| A question, a search, a scan — no files change | `/dev-sa` |
 | One scoped change you want reviewed | `/dev`, `/dev-sa`, or `/dev-tab` |
 | Multi-phase (write → review → retro), or you expect reviewer pushback | `/orchestrate` |
 | Large or parallel, and you want explicit file scoping first | `/orchestrate-spec` → `/orchestrate` |
 
 Pick the **surface** by how you want to interact (inline / separate pane / one-shot
-subagent) and the **cycle** by whether you want it reviewed. The `-q` suffix is always
-"skip the review."
+subagent).
 
 **The gate, as `/dev-sa` words it:** *"if the ask needs multiple phases (write → review
 → retro), will produce tracked artifacts, or involves iterative cycles, stop here and
