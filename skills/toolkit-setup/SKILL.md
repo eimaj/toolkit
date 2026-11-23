@@ -110,7 +110,7 @@ symlinks and failed repos — read it, but treat the VERIFY as the authority.
 
 - **clog** — the CLI lands in `~/.local/bin`; its setup only *warns* if that is off
   PATH. `command -v clog` returning nothing is the most common first-run snag.
-- **dev-prompter** — seven directories link, not six: five `/dev` skills, `pr-review`,
+- **dev-prompter** — five directories link, not four: three `/dev` skills, `pr-review`,
   and `_devkit` (a shared base, not a slash command).
 - **orchestrate** — the `code-writer` agents run as shipped. Only `feature-scoper`'s
   carry `[TODO]` placeholders, and a run fast-fails while any remain.
